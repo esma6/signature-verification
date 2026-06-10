@@ -20,7 +20,7 @@ This project removes that ambiguity: **all six experiments share one identical p
   - **Writer-Independent (WI):** writer-disjoint split; test writers are never seen in training.
 - **Biometric evaluation:** beyond accuracy/precision/recall/F1, we report FAR, FRR, AER, and EER.
 
-![Methodology](docs/methodology.png)
+![Methodology](docs/signature-architecture.png)
 
 ## Results
 
@@ -50,7 +50,7 @@ This project removes that ambiguity: **all six experiments share one identical p
 
 A clear **difficulty ordering by writing system** emerges: **CEDAR < BHSig < UTSig** (Latin easiest, Perso-Arabic hardest). The gap *between* datasets is much larger than the WD–WI gap *within* a dataset — i.e., the **dataset effect dominates the scenario effect**. This suggests the frozen ImageNet feature extractor aligns far better with Latin-script signatures than with Devanagari or Perso-Arabic ones, and that high accuracy on a single dataset is not by itself evidence of generalizability.
 
-![EER comparison](results/figures/overall_eer.png)
+![EER comparison](results/figures/overall_eer-eng.png)
 
 ## Datasets
 
