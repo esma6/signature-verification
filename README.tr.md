@@ -50,7 +50,7 @@ Bu proje o belirsizliği ortadan kaldırır: **altı deneyin tamamı tek ve özd
 
 Yazı sistemine göre net bir **zorluk sıralaması** ortaya çıkar: **CEDAR < BHSig < UTSig** (Latin en kolay, Perso-Arabik en zor). Veri setleri *arasındaki* fark, aynı veri seti *içindeki* WD–WI farkından çok daha büyüktür — yani **veri seti etkisi senaryo etkisinden baskındır**. Bu, donmuş ImageNet öznitelik çıkarıcısının Latin imzalara, Devanagari ve Perso-Arabik imzalardan çok daha iyi uyduğunu; tek bir veri setindeki yüksek doğruluğun tek başına genellenebilirlik kanıtı olmadığını gösterir.
 
-![EER karşılaştırması](results/figures/overall_eer.png)
+![EER karşılaştırması](results/figures/overall_eer-tr.png)
 
 ## Veri Setleri
 
