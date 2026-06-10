@@ -1,0 +1,1 @@
+{"dataset": "utsig", "scenario": "wi", "epochs_run": 12, "test_accuracy": 0.7278, "precision": 0.6649, "recall": 0.6135, "f1_score": 0.6382, "roc_auc": 0.7938}

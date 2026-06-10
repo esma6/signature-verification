@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Training outputs
+outputs_unified/
+*.pth
+*.ckpt
+
+# Datasets (never commit raw data)
+veri/
+data/
+*.tif
+*.png.raw
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.synctex.gz
