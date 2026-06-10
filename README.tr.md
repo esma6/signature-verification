@@ -20,7 +20,7 @@ Bu proje o belirsizliği ortadan kaldırır: **altı deneyin tamamı tek ve özd
   - **Yazar-bağımsız (WI):** kişi-ayrık bölme; test kişileri eğitimde hiç görülmez.
 - **Biyometrik değerlendirme:** doğruluk/kesinlik/duyarlılık/F1'in yanı sıra FAR, FRR, AER ve EER raporlanır.
 
-![Yöntem](docs/methodology.png)
+![Yöntem](docs/signature-mimari.png)
 
 ## Sonuçlar
 
