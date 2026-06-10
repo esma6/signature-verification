@@ -77,7 +77,7 @@ A clear **difficulty ordering by writing system** emerges: **CEDAR < BHSig < UTS
 │   ├── figures/                     # generated comparison charts
 │   └── metrics/                     # per-scenario + aggregate JSON metrics
 ├── docs/
-│   └── methodology.png              # pipeline diagram
+│   └── signature-architecture.png   # pipeline diagram
 ├── paper/                           # manuscript (docx + pdf)
 ├── requirements.txt
 ├── LICENSE
