@@ -77,7 +77,7 @@ Yazı sistemine göre net bir **zorluk sıralaması** ortaya çıkar: **CEDAR < 
 │   ├── figures/                     # üretilen karşılaştırma grafikleri
 │   └── metrics/                     # senaryo bazında + toplu JSON metrikler
 ├── docs/
-│   └── methodology.png              # yöntem akış diyagramı
+│   └── signature-mimari.png         # yöntem akış diyagramı
 ├── paper/                           # makale (docx + pdf)
 ├── requirements.txt
 ├── LICENSE
