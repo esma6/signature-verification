@@ -1,23 +1,34 @@
 """
-ORTAK EĞİTİM SCRIPTİ - train_unified.py
-========================================
-Tüm deneyler (3 veri seti × 2 senaryo) TEK kod ve TEK protokolle.
+ORTAK EĞİTİM SCRIPTİ (GENİŞLETİLMİŞ) - train_unified.py
+========================================================
+Tüm deneyler TEK kod ve TEK adil protokolle. Bu sürüm iki yeni eksen ekler:
 
-Kullanım:
-    python train_unified.py --dataset cedar  --scenario wd
-    python train_unified.py --dataset cedar  --scenario wi
-    python train_unified.py --dataset bhsig  --scenario wd
-    python train_unified.py --dataset bhsig  --scenario wi
-    python train_unified.py --dataset hybrid --scenario wd
-    python train_unified.py --dataset hybrid --scenario wi
+  1) ÇOKLU OMURGA (backbone karşılaştırması):
+       --backbone {resnet50, vgg19, densenet121, efficientnet_b0}
+  2) ABLASYON (omurga donuk mu, ince-ayarlı mı):
+       --finetune {none, last_block}
+         none       -> omurga TAMAMEN donuk, sadece sınıflandırıcı kafa eğitilir (varsayılan)
+         last_block -> omurganın SON bloğu da çözülür (ince-ayar) -> ABLASYON karşılaştırması
 
-ADİL PROTOKOL (hepsi aynı):
-    - ResNet50 (ImageNet), omurga DONMUŞ, sadece sınıflandırıcı kafa eğitilir
+Kullanım örnekleri:
+    # Ana çok-omurga karşılaştırması (donuk omurga, adil protokol):
+    python train_unified.py --dataset cedar --scenario wd --backbone resnet50
+    python train_unified.py --dataset cedar --scenario wd --backbone vgg19
+    python train_unified.py --dataset cedar --scenario wd --backbone densenet121
+    python train_unified.py --dataset cedar --scenario wd --backbone efficientnet_b0
+
+    # Ablasyon (aynı omurga, donuk vs ince-ayar):
+    python train_unified.py --dataset cedar --scenario wd --backbone resnet50 --finetune none
+    python train_unified.py --dataset cedar --scenario wd --backbone resnet50 --finetune last_block
+
+ADİL PROTOKOL (hepsinde sabit):
+    - ImageNet ön-eğitimli omurga
     - 30 epoch + early stopping (patience=5)
     - Adam lr=1e-4, weight_decay=5e-4, batch=32, dropout=0.3
     - 224x224, ImageNet normalizasyonu, seed=42
+    (İnce-ayar modunda çözülen katmanlar için lr=1e-5 kullanılır; aşırı bozulmayı önler.)
 
-Çıktılar: outputs_unified/<dataset>_<scenario>/
+Çıktılar: outputs_unified/<dataset>_<scenario>_<backbone>_<finetune>/
     best_model.pth, training_history.json, training_curves.png,
     confusion_matrix.png, roc_curve.png, test_metrics.json
 """
@@ -59,13 +70,18 @@ class P:
     BATCH_SIZE = 32
     NUM_EPOCHS = 30
     EARLY_STOPPING_PATIENCE = 5
-    LEARNING_RATE = 1e-4
+    LEARNING_RATE = 1e-4          # sınıflandırıcı kafa için
+    FINETUNE_LR = 1e-5            # ince-ayarda çözülen omurga katmanları için (daha küçük)
     WEIGHT_DECAY = 5e-4
     DROPOUT = 0.3
     NUM_WORKERS = 0
     SEED = 42
     TEST_RATIO = 0.2
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+# Desteklenen omurgalar ve ImageNet ağırlıkları
+BACKBONES = ["resnet50", "vgg19", "densenet121", "efficientnet_b0"]
 
 
 class ListDataset(Dataset):
@@ -114,19 +130,85 @@ def get_transforms(img_size, scenario):
     return train_tf, val_tf
 
 
-def build_model(num_classes=2, dropout=0.3):
-    model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
-    for p in model.parameters():
-        p.requires_grad = False               # omurga DONMUŞ
-    in_features = model.fc.in_features
-    model.fc = nn.Sequential(
+def make_head(in_features, num_classes, dropout):
+    """Tüm omurgalar için ORTAK sınıflandırıcı kafa (adil protokol)."""
+    return nn.Sequential(
         nn.Dropout(p=dropout),
         nn.Linear(in_features, 256),
         nn.ReLU(inplace=True),
         nn.Dropout(p=dropout),
         nn.Linear(256, num_classes),
     )
-    return model
+
+
+def build_model(backbone, num_classes=2, dropout=0.3, finetune="none"):
+    """
+    Seçilen omurgayı ImageNet ağırlıklarıyla kurar, omurgayı dondurur,
+    ortak sınıflandırıcı kafayı ekler. finetune='last_block' ise omurganın
+    son bloğunu yeniden eğitilebilir yapar (ABLASYON).
+
+    Döndürür: (model, finetune_param_list)
+      finetune_param_list -> ince-ayarda çözülen omurga parametreleri (ayrı lr için).
+    """
+    finetune_params = []
+
+    if backbone == "resnet50":
+        model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
+        for p in model.parameters():
+            p.requires_grad = False
+        in_features = model.fc.in_features
+        model.fc = make_head(in_features, num_classes, dropout)
+        if finetune == "last_block":
+            # ResNet'in son evrişim bloğu: layer4
+            for p in model.layer4.parameters():
+                p.requires_grad = True
+                finetune_params.append(p)
+
+    elif backbone == "vgg19":
+        model = models.vgg19(weights=models.VGG19_Weights.IMAGENET1K_V1)
+        for p in model.parameters():
+            p.requires_grad = False
+        in_features = model.classifier[0].in_features   # 25088
+        model.classifier = make_head(in_features, num_classes, dropout)
+        if finetune == "last_block":
+            # VGG'nin son evrişim bloğu: features katmanlarının son ~5'i (block5)
+            feat_layers = list(model.features.children())
+            for layer in feat_layers[-5:]:
+                for p in layer.parameters():
+                    p.requires_grad = True
+                    finetune_params.append(p)
+
+    elif backbone == "densenet121":
+        model = models.densenet121(weights=models.DenseNet121_Weights.IMAGENET1K_V1)
+        for p in model.parameters():
+            p.requires_grad = False
+        in_features = model.classifier.in_features      # 1024
+        model.classifier = make_head(in_features, num_classes, dropout)
+        if finetune == "last_block":
+            # DenseNet'in son bloğu: features.denseblock4 (+ norm5)
+            for p in model.features.denseblock4.parameters():
+                p.requires_grad = True
+                finetune_params.append(p)
+            for p in model.features.norm5.parameters():
+                p.requires_grad = True
+                finetune_params.append(p)
+
+    elif backbone == "efficientnet_b0":
+        model = models.efficientnet_b0(weights=models.EfficientNet_B0_Weights.IMAGENET1K_V1)
+        for p in model.parameters():
+            p.requires_grad = False
+        in_features = model.classifier[1].in_features   # 1280
+        model.classifier = make_head(in_features, num_classes, dropout)
+        if finetune == "last_block":
+            # EfficientNet'in son özellik bloğu: features[-1] (son MBConv + üst conv)
+            for p in model.features[-1].parameters():
+                p.requires_grad = True
+                finetune_params.append(p)
+
+    else:
+        raise ValueError(f"Bilinmeyen backbone: {backbone}")
+
+    return model, finetune_params
 
 
 def train_one_epoch(model, loader, criterion, optimizer, device):
@@ -206,19 +288,24 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dataset", required=True, choices=["cedar", "bhsig", "utsig"])
     ap.add_argument("--scenario", required=True, choices=["wd", "wi"])
+    ap.add_argument("--backbone", default="resnet50", choices=BACKBONES,
+                    help="Omurga mimarisi (varsayılan: resnet50)")
+    ap.add_argument("--finetune", default="none", choices=["none", "last_block"],
+                    help="none=omurga donuk (varsayılan); last_block=son blok ince-ayar (ablasyon)")
     args = ap.parse_args()
 
     torch.manual_seed(P.SEED)
     np.random.seed(P.SEED)
 
-    tag = f"{args.dataset}_{args.scenario}"
+    tag = f"{args.dataset}_{args.scenario}_{args.backbone}_{args.finetune}"
     out_dir = os.path.join("outputs_unified", tag)
     os.makedirs(out_dir, exist_ok=True)
     class_names = ["forged", "genuine"]
 
-    print("=" * 64)
-    print(f"DENEY: {args.dataset.upper()} / {args.scenario.upper()}  (ADİL PROTOKOL)")
-    print("=" * 64)
+    print("=" * 70)
+    print(f"DENEY: {args.dataset.upper()} / {args.scenario.upper()} / "
+          f"{args.backbone} / finetune={args.finetune}")
+    print("=" * 70)
     print(f"Cihaz: {P.DEVICE}")
 
     # ---- Veri ----
@@ -237,14 +324,26 @@ def main():
                              num_workers=P.NUM_WORKERS, pin_memory=True)
 
     # ---- Model ----
-    model = build_model(num_classes=2, dropout=P.DROPOUT).to(P.DEVICE)
+    model, finetune_params = build_model(args.backbone, num_classes=2,
+                                         dropout=P.DROPOUT, finetune=args.finetune)
+    model = model.to(P.DEVICE)
     n_tr = sum(p.numel() for p in model.parameters() if p.requires_grad)
     n_all = sum(p.numel() for p in model.parameters())
-    print(f"Eğitilebilir parametre: {n_tr:,} / {n_all:,} (omurga donmuş)")
+    print(f"Omurga: {args.backbone} | finetune={args.finetune}")
+    print(f"Eğitilebilir parametre: {n_tr:,} / {n_all:,} "
+          f"({100.0*n_tr/n_all:.2f}%)")
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()),
-                           lr=P.LEARNING_RATE, weight_decay=P.WEIGHT_DECAY)
+
+    # Sınıflandırıcı kafa parametreleri (her zaman eğitilir)
+    head_params = [p for n, p in model.named_parameters()
+                   if p.requires_grad and not any(p is fp for fp in finetune_params)]
+    param_groups = [{"params": head_params, "lr": P.LEARNING_RATE}]
+    if finetune_params:
+        # ince-ayarda çözülen omurga katmanları daha küçük lr ile
+        param_groups.append({"params": finetune_params, "lr": P.FINETUNE_LR})
+
+    optimizer = optim.Adam(param_groups, weight_decay=P.WEIGHT_DECAY)
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=3)
 
     history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
@@ -267,7 +366,8 @@ def main():
             best_acc = val_acc
             best_weights = copy.deepcopy(model.state_dict())
             torch.save({"model_state_dict": best_weights, "class_names": class_names,
-                        "img_size": P.IMG_SIZE, "val_acc": best_acc, "dropout": P.DROPOUT},
+                        "img_size": P.IMG_SIZE, "val_acc": best_acc, "dropout": P.DROPOUT,
+                        "backbone": args.backbone, "finetune": args.finetune},
                        os.path.join(out_dir, "best_model.pth"))
             print(f"  -> Yeni en iyi model (val_acc={best_acc:.4f})")
             no_improve = 0
@@ -285,11 +385,11 @@ def main():
         json.dump(history, f, indent=2)
 
     # ---- Değerlendirme ----
-    title = f"{args.dataset.upper()} {args.scenario.upper()}"
+    title = f"{args.dataset.upper()} {args.scenario.upper()} {args.backbone} ft={args.finetune}"
     _, val_acc, preds, labels, probs = evaluate(model, test_loader, criterion, P.DEVICE)
-    print("\n" + "=" * 64)
+    print("\n" + "=" * 70)
     print(f"TEST DEĞERLENDİRMESİ ({title})")
-    print("=" * 64)
+    print("=" * 70)
     print(f"Test Accuracy:  {val_acc:.4f}")
     print(f"Precision:      {precision_score(labels, preds):.4f}")
     print(f"Recall:         {recall_score(labels, preds):.4f}")
@@ -303,6 +403,8 @@ def main():
 
     metrics = {
         "dataset": args.dataset, "scenario": args.scenario,
+        "backbone": args.backbone, "finetune": args.finetune,
+        "trainable_params": int(n_tr), "total_params": int(n_all),
         "epochs_run": len(history["train_loss"]),
         "test_accuracy": float(val_acc),
         "precision": float(precision_score(labels, preds)),
