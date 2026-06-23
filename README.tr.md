@@ -1,6 +1,6 @@
 # Yazı Sistemleri Arası Çevrimdışı İmza Doğrulama
 
-Üç farklı **yazı sistemi** — Latin (CEDAR), Devanagari (BHSig) ve Perso-Arabik (UTSig) — üzerinde, donmuş omurgalı ResNet50 transfer öğrenme yaklaşımıyla yapılan **adil ve kontrollü** bir çevrimdışı el yazısı imza doğrulama karşılaştırması.
+Üç farklı **yazı sistemi** — Latin (CEDAR), Devanagari (BHSig) ve Perso-Arabik (UTSig) — üzerinde, **dört önceden eğitilmiş omurga ile transfer öğrenme** kullanılarak tek ve özdeş bir protokol altında yapılan adil ve kontrollü bir karşılaştırma; ayrıca **donuk-omurga vs ince-ayar ablasyonu**.
 
 > 🇬🇧 For English, see [README.md](README.md).
 
@@ -8,49 +8,79 @@
 
 ## Motivasyon
 
-Çevrimdışı imza doğrulama çalışmalarının çoğu **tek bir veri seti** (genellikle Latin karakterli CEDAR) üzerinde değerlendirilir ve elde edilen başarımın diğer yazı sistemlerine genellenip genellenmediği nadiren test edilir. Üstelik yöntemsel tercihler (ön işleme, mimari, eğitim bütçesi) çalışmadan çalışmaya değiştiği için, raporlanan bir başarım farkının **verinin içsel zorluğundan** mı yoksa yalnızca yöntem farklılıklarından mı kaynaklandığını anlamak zordur.
+Çevrimdışı imza doğrulama çalışmalarının çoğu **tek bir veri seti** (genellikle Latin karakterli CEDAR) ve **tek bir mimari** üzerinde değerlendirilir; raporlanan başarımın diğer yazı sistemlerine genellenip genellenmediği nadiren test edilir. Yöntemsel tercihler çalışmadan çalışmaya değiştiği için, bir başarım farkının **verinin içsel zorluğundan** mı, **mimari seçiminden** mi, yoksa yalnızca yöntem farklılıklarından mı kaynaklandığını anlamak zordur.
 
-Bu proje o belirsizliği ortadan kaldırır: **altı deneyin tamamı tek ve özdeş bir protokolü paylaşır** — aynı omurga, aynı hiperparametreler, aynı kod, aynı rastgelelik tohumu. Tek değişkenler *hangi veri seti* ve *hangi senaryo* (yazar-bağımlı / yazar-bağımsız) olduğudur.
+Bu proje o belirsizliği ortadan kaldırır. **Her deney tek ve özdeş bir protokolü paylaşır** — aynı hiperparametreler, aynı kod, aynı rastgelelik tohumu. Tek değişkenler: *hangi veri seti*, *hangi senaryo* (yazar-bağımlı/bağımsız), *hangi omurga* ve (ablasyonda) *omurganın donuk mu ince-ayarlı mı* olduğudur.
+
+## Bu sürümde yeni neler var
+
+Çalışma, tek-omurgalı bir temelden tam bir karşılaştırmalı çalışmaya genişletildi:
+
+- **Dört omurga** özdeş protokol altında karşılaştırıldı: ResNet50, VGG19, DenseNet121, EfficientNet-B0.
+- En iyi omurga (VGG19) üzerinde **ablasyon çalışması**: donuk omurga vs son-blok ince-ayarı.
+- **Biyometrik değerlendirme** (FAR/FRR/AER/EER) yalnızca ana model için değil, **30 modelin tamamı** için hesaplandı.
+- **Toplam 30 model**: 4 omurga × 3 veri × 2 senaryo (24) + VGG19 ablasyon × 6.
+
+![Mimari](docs/architecture_multibackbone.png)
 
 ## Temel Fikir
 
-- **Donmuş ResNet50 omurgası** (ImageNet ön eğitimli): yalnızca sınıflandırıcı kafa eğitilir (24M parametrenin ~525K'sı, ~%2,2).
+- **Donuk omurga** (ImageNet ön-eğitimli): yalnızca sınıflandırıcı kafa eğitilir — veri setleri arası karşılaştırma için adil, düşük-varyanslı bir taban.
 - **Veri seti başına iki senaryo:**
   - **Yazar-bağımlı (WD):** rastgele bölme; aynı kişi hem eğitim hem testte olabilir.
   - **Yazar-bağımsız (WI):** kişi-ayrık bölme; test kişileri eğitimde hiç görülmez.
-- **Biyometrik değerlendirme:** doğruluk/kesinlik/duyarlılık/F1'in yanı sıra FAR, FRR, AER ve EER raporlanır.
+- **Ablasyon:** VGG19'da son evrişim bloğu çözülür (daha küçük lr=1e-5 ile ince-ayar) — donuk-omurga kararının ne kazandırıp ne kaybettirdiğini ölçmek için.
+- **Biyometrik değerlendirme:** doğruluk/kesinlik/duyarlılık/F1'in yanı sıra her model için FAR, FRR, AER ve EER raporlanır.
 
-![Yöntem](docs/signature-mimari.png)
+## Sonuçlar — aşama aşama
 
-## Sonuçlar
+### Aşama 1 — Başlangıç: tek omurga (ResNet50)
 
-### Sınıflandırma metrikleri
+İlk çalışma donuk ResNet50 kullandı. Ana bulguyu — net bir **yazı sistemi zorluk sıralaması, CEDAR < BHSig < UTSig** — ortaya koydu, ancak bu sıralamanın seçilen mimarinin bir yan etkisi olup olmadığı açık kaldı.
 
-| Veri Seti | Senaryo | Doğruluk | Kesinlik | Duyarlılık | F1 | ROC-AUC |
-|-----------|---------|---------:|---------:|-----------:|------:|--------:|
-| CEDAR (Latin)        | WD | 0,945 | 0,914 | 0,981 | 0,946 | 0,991 |
-| CEDAR (Latin)        | WI | 0,866 | 0,832 | 0,917 | 0,872 | 0,938 |
-| BHSig (Devanagari)   | WD | 0,772 | 0,770 | 0,675 | 0,719 | 0,831 |
-| BHSig (Devanagari)   | WI | 0,808 | 0,812 | 0,740 | 0,775 | 0,880 |
-| UTSig (Perso-Arabik) | WD | 0,756 | 0,724 | 0,673 | 0,697 | 0,827 |
-| UTSig (Perso-Arabik) | WI | 0,728 | 0,665 | 0,614 | 0,638 | 0,794 |
+![Aşama 1](results/figures/stage1_resnet_eer.png)
 
-### Biyometrik metrikler (%)
+### Aşama 2 — Çok-omurga karşılaştırması
 
-| Veri Seti | Senaryo | FAR | FRR | AER | EER |
-|-----------|---------|----:|----:|----:|----:|
-| CEDAR (Latin)        | WD |  8,99 |  1,92 |  5,45 |  **3,03** |
-| CEDAR (Latin)        | WI | 18,56 |  8,33 | 13,45 | **12,50** |
-| BHSig (Devanagari)   | WD | 15,40 | 32,54 | 23,97 | **24,50** |
-| BHSig (Devanagari)   | WI | 13,72 | 25,96 | 19,84 | **19,41** |
-| UTSig (Perso-Arabik) | WD | 18,40 | 32,73 | 25,56 | **26,40** |
-| UTSig (Perso-Arabik) | WI | 19,88 | 38,65 | 29,26 | **28,38** |
+Özdeş protokol altında üç omurga daha eklemek, **zorlu Latin-dışı veri setlerinde mimarinin muazzam fark yarattığını** ortaya koyuyor. VGG19, altı senaryonun dördünü kazanıyor ve en önemli yerlerde dramatik biçimde daha iyi: BHSig-WD'de EER'i %24,5'ten (ResNet50) **%4,45'e**, UTSig-WD'de %26,5'ten **%10,27'ye** düşürüyor.
+
+![Aşama 2 — doğruluk](results/figures/backbone_accuracy.png)
+
+![Aşama 2 — EER](results/figures/stage2_backbone_eer.png)
+
+**Sınıflandırma doğruluğu (donuk omurga):**
+
+| Veri / Senaryo | ResNet50 | VGG19 | DenseNet121 | EfficientNet-B0 |
+|----------------|---------:|------:|------------:|----------------:|
+| CEDAR-WD | 0,945 | **0,977** | 0,962 | 0,970 |
+| CEDAR-WI | 0,866 | 0,915 | 0,879 | **0,917** |
+| BHSig-WD | 0,772 | **0,958** | 0,799 | 0,754 |
+| BHSig-WI | 0,808 | **0,823** | 0,818 | 0,790 |
+| UTSig-WD | 0,756 | **0,906** | 0,734 | 0,741 |
+| UTSig-WI | 0,728 | 0,663 | **0,735** | 0,701 |
+
+VGG19, en zor yazar-bağımsız durumlar hariç baskın. UTSig-WI'da **aşırı uyum** gösteriyor (duyarlılık 0,33'e düşüyor) ve DenseNet121 öne geçiyor. Yüksek kapasite her zaman en iyi değil.
+
+### Aşama 3 — Ablasyon: donuk vs ince-ayar (VGG19)
+
+Son bloğu çözmek esas olarak **yazar-bağımlı** senaryolarda yardımcı oluyor, yazar-bağımsızda güvenilmez — bu da donuk-omurga seçiminin sağlam bir taban olduğunu doğruluyor.
+
+![Aşama 3 — EER](results/figures/stage3_ablation_eer.png)
+
+| Veri / Senaryo | Donuk EER | İnce-ayar EER | Δ EER |
+|----------------|----------:|--------------:|------:|
+| CEDAR-WD | 2,46 | **0,76** | −1,70 |
+| CEDAR-WI | 8,90 | 8,90 | 0,00 |
+| BHSig-WD | 4,45 | **2,28** | −2,17 |
+| BHSig-WI | 17,80 | **15,95** | −1,85 |
+| UTSig-WD | 10,27 | **7,43** | −2,84 |
+| UTSig-WI | 37,73 | 35,10 | −2,63 |
+
+İnce-ayar yazar-bağımlı senaryolarda EER'i düşürüyor (ör. UTSig-WD 10,27→7,43), ama yazar-bağımsız UTSig-WI'da model ciddi aşırı uyum rejiminde kalıyor (FRR ~%60, gerçek imzaların çoğunu reddediyor).
 
 ### Ana Bulgu
 
-Yazı sistemine göre net bir **zorluk sıralaması** ortaya çıkar: **CEDAR < BHSig < UTSig** (Latin en kolay, Perso-Arabik en zor). Veri setleri *arasındaki* fark, aynı veri seti *içindeki* WD–WI farkından çok daha büyüktür — yani **veri seti etkisi senaryo etkisinden baskındır**. Bu, donmuş ImageNet öznitelik çıkarıcısının Latin imzalara, Devanagari ve Perso-Arabik imzalardan çok daha iyi uyduğunu; tek bir veri setindeki yüksek doğruluğun tek başına genellenebilirlik kanıtı olmadığını gösterir.
-
-![EER karşılaştırması](results/figures/overall_eer-tr.png)
+Net bir **yazı sistemi zorluk sıralaması** dört omurgada da korunuyor: **CEDAR < BHSig < UTSig**. Veri seti etkisi WD–WI senaryo etkisinden baskın ve tek bir veri setinde (veya tek bir mimaride) yüksek doğruluk, tek başına genellenebilirlik kanıtı **değil** — omurga seçimi en zor veri setlerinde sonuçları ~20 EER puanına kadar değiştiriyor.
 
 ## Veri Setleri
 
@@ -63,21 +93,23 @@ Yazı sistemine göre net bir **zorluk sıralaması** ortaya çıkar: **CEDAR < 
 | Toplam | 2.640 | 14.040 | 7.935 |
 | Sahtecilik | Amatör | Yetenekli | Yetenekli |
 
-> Veri setleri burada **paylaşılmaz**. Orijinal kaynaklarından edinip her birini `train/{genuine,forged}` ve `test/{genuine,forged}` biçiminde düzenleyin. Yolları `src/signature_data.py` dosyasının başından güncelleyin.
+> Veri setleri burada **paylaşılmaz**. Orijinal kaynaklarından edinip her birini `train/{genuine,forged}` ve `test/{genuine,forged}` biçiminde düzenleyin. Yolları `src/signature_data.py` başından güncelleyin.
 
 ## Depo Yapısı
 
 ```
 .
 ├── src/
-│   ├── signature_data.py            # veri yükleme + WD/WI bölme (üç veri seti tek yerde)
-│   ├── train_unified.py             # eğitim sürücüsü: --dataset {cedar,bhsig,utsig} --scenario {wd,wi}
-│   └── compute_metrics_unified.py   # altı model için FAR/FRR/AER/EER + karşılaştırma grafikleri
+│   ├── signature_data.py            # veri yükleme + WD/WI bölme (üç veri seti)
+│   ├── train_unified.py             # eğitim: --dataset --scenario --backbone --finetune
+│   ├── compute_metrics_unified.py   # ilk ResNet50 koşusu için biyometrik metrikler
+│   ├── compute_biometrics_all.py    # TÜM modeller için FAR/FRR/EER
+│   └── aggregate_results.py         # omurga + ablasyon karşılaştırma tabloları/grafikleri
 ├── results/
-│   ├── figures/                     # üretilen karşılaştırma grafikleri
-│   └── metrics/                     # senaryo bazında + toplu JSON metrikler
+│   ├── figures/                     # aşamalı karşılaştırma grafikleri (doğruluk + EER)
+│   └── metrics/                     # all_results_classification.csv, all_results_biometric.csv, ablation_vgg19.csv
 ├── docs/
-│   └── signature-mimari.png         # yöntem akış diyagramı
+│   └── architecture_multibackbone.png   # mimari + ablasyon diyagramı
 ├── paper/                           # makale (docx + pdf)
 ├── requirements.txt
 ├── LICENSE
@@ -90,37 +122,38 @@ Yazı sistemine göre net bir **zorluk sıralaması** ortaya çıkar: **CEDAR < 
 pip install -r requirements.txt
 ```
 
-Python 3.9+ ve PyTorch gerektirir. GPU önerilir ama zorunlu değildir (bu deneyler CPU üzerinde çalıştırılmıştır).
+Python 3.9+ ve PyTorch gerektirir. GPU önerilir ama zorunlu değildir (deneyler CPU'da çalıştırılmıştır).
 
 ## Kullanım
 
-`src/signature_data.py` başındaki veri yollarını düzenleyin, ardından her deneyi çalıştırın:
+`src/signature_data.py` başındaki veri yollarını düzenleyin, sonra deneyleri çalıştırın. Her deney veri seti, senaryo, omurga ve ince-ayar moduyla parametrelenir:
 
 ```bash
 cd src
-python train_unified.py --dataset cedar --scenario wd
-python train_unified.py --dataset cedar --scenario wi
-python train_unified.py --dataset bhsig --scenario wd
-python train_unified.py --dataset bhsig --scenario wi
-python train_unified.py --dataset utsig --scenario wd
-python train_unified.py --dataset utsig --scenario wi
+# Çok-omurga karşılaştırması (donuk omurga)
+python train_unified.py --dataset cedar --scenario wd --backbone vgg19
+python train_unified.py --dataset bhsig --scenario wd --backbone densenet121
+python train_unified.py --dataset utsig --scenario wi --backbone efficientnet_b0
+# ... (4 omurga × 3 veri × 2 senaryo)
+
+# Ablasyon (donuk vs ince-ayar, VGG19'da)
+python train_unified.py --dataset utsig --scenario wd --backbone vgg19 --finetune last_block
 ```
 
-Sonra biyometrik metrikleri toplayıp tüm grafikleri üretin:
+Sonra sonuçları toplayın ve tüm modeller için biyometrik metrikleri hesaplayın:
 
 ```bash
-python compute_metrics_unified.py
+python aggregate_results.py          # karşılaştırma tabloları + grafikler
+python compute_biometrics_all.py     # 30 modelin tamamı için FAR/FRR/AER/EER
 ```
 
-Çıktılar `outputs_unified/<veri>_<senaryo>/` (model başına) ve `outputs_unified/_metrics/` (toplu metrik + grafikler) altına yazılır.
-
-## Eğitim Protokolü (altı deney için özdeş)
+## Eğitim Protokolü (tüm deneylerde özdeş)
 
 | Hiperparametre | Değer |
 |----------------|-------|
-| Omurga | ResNet50 (ImageNet), donmuş |
-| Eğitilen parametre | ~525K / 24M (%2,2) |
-| Optimizasyon | Adam, lr = 1e-4 |
+| Omurgalar | ResNet50 · VGG19 · DenseNet121 · EfficientNet-B0 (ImageNet, donuk) |
+| İnce-ayar (ablasyon) | son evrişim bloğu çözülür, lr=1e-5 |
+| Optimizasyon | Adam, lr = 1e-4 (kafa) |
 | Ağırlık sönümü | 5e-4 |
 | Batch boyutu | 32 |
 | Epoch | 30 (erken durdurma, sabır = 5) |
@@ -130,7 +163,7 @@ python compute_metrics_unified.py
 
 ## Tekrar Üretilebilirlik
 
-Bölmeler sabit tohumla (42) bellekte yapılır ve tamamen deterministiktir — `train_unified.py` ve `compute_metrics_unified.py` aynı `signature_data` modülünü kullandığından, her model tam olarak eğitildiği test kümesi üzerinde değerlendirilir.
+Bölmeler sabit tohumla (42) bellekte yapılır ve tamamen deterministiktir — tüm scriptler aynı `signature_data` modülünü kullandığından, her model tam olarak eğitildiği test kümesinde değerlendirilir. `compute_biometrics_all.py` her kayıtlı modeli yeniden yükleyip aynı deterministik test kümesinde yeniden skorlar.
 
 ## Atıf
 
