@@ -1,7 +1,0 @@
-dataset,writing_system,scenario,accuracy,precision,recall,f1,roc_auc,far,frr,aer,eer
-cedar,Latin,WD,0.945,0.914,0.981,0.946,0.991,8.99,1.92,5.45,3.03
-cedar,Latin,WI,0.866,0.832,0.917,0.872,0.938,18.56,8.33,13.45,12.50
-bhsig,Devanagari,WD,0.772,0.770,0.675,0.719,0.831,15.40,32.54,23.97,24.50
-bhsig,Devanagari,WI,0.808,0.812,0.740,0.775,0.880,13.72,25.96,19.84,19.41
-utsig,Perso-Arabic,WD,0.756,0.724,0.673,0.697,0.827,18.40,32.73,25.56,26.40
-utsig,Perso-Arabic,WI,0.728,0.665,0.614,0.638,0.794,19.88,38.65,29.26,28.38
