@@ -1,7 +1,0 @@
-dataset,scenario,acc_frozen,acc_finetuned,delta_acc,eer_frozen,eer_finetuned,delta_eer
-cedar,wd,0.977,0.9905,+0.014,2.46,0.76,-1.70
-cedar,wi,0.915,0.9015,-0.014,8.90,8.90,0.00
-bhsig,wd,0.958,0.9783,+0.020,4.45,2.28,-2.17
-bhsig,wi,0.823,0.8415,+0.019,17.80,15.95,-1.85
-utsig,wd,0.906,0.9269,+0.021,10.27,7.43,-2.84
-utsig,wi,0.663,0.6868,+0.024,37.73,35.10,-2.63
