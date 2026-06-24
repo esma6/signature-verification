@@ -73,11 +73,11 @@ The frozen-backbone comparison shows that **backbone choice strongly affects per
 
 ### Accuracy comparison
 
-![Backbone accuracy](results/figures/backbone_accuracy.png)
+![Backbone accuracy](results/figures/backbone_accuracy-eng.png)
 
 ### EER comparison
 
-![Backbone EER](results/figures/stage2_backbone_eer.png)
+![Backbone EER](results/figures/stage2_backbone_eer-eng.png)
 
 ---
 
@@ -155,7 +155,7 @@ This result suggests that high-capacity architectures may not always be the safe
 
 The ablation study compares frozen VGG19 against VGG19 with the last convolutional block unfrozen and fine-tuned.
 
-![VGG19 ablation EER](results/figures/stage3_ablation_eer.png)
+![VGG19 ablation EER](results/figures/stage3_ablation_eer-eng.png)
 
 ---
 
